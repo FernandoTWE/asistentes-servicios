@@ -1,33 +1,111 @@
 ---
+import Layout from '../layouts/Layout.astro';
 import { ServiceSelector } from '../components/Services/ServiceSelector';
 import { LanguageSelector } from '../components/Layout/LanguageSelector';
 import { ChatWindow } from '../components/Chat/ChatWindow';
-import { servicesAPI } from '../lib/api/directus';
+import { directusAPI } from '../lib/api/directus';
 
-// Obtener servicios de Directus
-const services = await servicesAPI.getServices();
+// Obtener servicios y usuarios de Directus
+const [servicesResponse, usersResponse] = await Promise.all([
+  directusAPI.getServices(),
+  directusAPI.getUsers()
+]);
+
+const services = servicesResponse.data || [];
+const users = usersResponse.data || [];
+const initialService = services[0] || null;
+
+// Usuario por defecto o el primero de la lista
+const defaultUser = users[0] || { id: null, name: 'Invitado' };
 ---
 
-<html lang="es">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Asistente de Servicios</title>
-	</head>
-	<body class="bg-gray-100 min-h-screen">
-		<div class="container mx-auto px-4 py-8">
-			<div class="max-w-4xl mx-auto">
-				<h1 class="text-3xl font-bold text-gray-900 mb-8">Asistente de Servicios</h1>
-				
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-					<ServiceSelector client:load services={services} />
-					<LanguageSelector client:load />
-				</div>
+<Layout title="Chat">
+  <main class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="mb-6 flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Servicio
+          </label>
+          <ServiceSelector services={services} client:load />
+        </div>
+        
+        <div class="w-32">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Idioma
+          </label>
+          <LanguageSelector client:load />
+        </div>
 
-				<ChatWindow client:load />
-			</div>
-		</div>
-	</body>
-</html>
+        <div class="w-48">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Usuario
+          </label>
+          <select
+            id="userId"
+            name="userId"
+            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            {users.map(user => (
+              <option value={user.id}>{user.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <ChatWindow 
+        client:load 
+        initialService={initialService}
+      />
+    </div>
+  </main>
+
+  <script>
+    // Estado global
+    let currentService = null;
+    let currentLanguage = 'es';
+    let currentUserId = null;
+
+    // Inicializar estado desde localStorage
+    if (typeof window !== 'undefined') {
+      currentLanguage = localStorage.getItem('selectedLanguage') || 'es';
+      
+      // Inicializar selector de usuario
+      const userSelect = document.getElementById('userId');
+      if (userSelect) {
+        currentUserId = userSelect.value;
+        userSelect.addEventListener('change', (e) => {
+          currentUserId = e.target.value;
+          localStorage.setItem('selectedUserId', currentUserId);
+          const userName = e.target.options[e.target.selectedIndex].text;
+          window.dispatchEvent(new CustomEvent('userNameChange', { detail: userName }));
+        });
+      }
+    }
+
+    // Función global para obtener el estado actual
+    window.getCurrentState = () => ({
+      service: currentService,
+      language: currentLanguage,
+      userId: currentUserId,
+      userName: document.getElementById('userId')?.options[document.getElementById('userId').selectedIndex]?.text
+    });
+
+    // Event listeners
+    window.handleServiceChange = (service) => {
+      currentService = service;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedServiceId', service.id);
+      }
+      document.dispatchEvent(new CustomEvent('serviceChange', { detail: service }));
+    };
+
+    window.handleLanguageChange = (language) => {
+      currentLanguage = language;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedLanguage', language);
+      }
+      document.dispatchEvent(new CustomEvent('languageChange', { detail: language }));
+    };
+  </script>
+</Layout>

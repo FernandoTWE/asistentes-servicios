@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import clsx from 'clsx';
@@ -13,13 +13,27 @@ const languages = [
   { code: 'nl', name: 'Nederlands' }
 ];
 
-export function LanguageSelector({ selectedLanguage, onLanguageChange }) {
+export function LanguageSelector({ selectedLanguage = 'es' }) {
+  const [selected, setSelected] = useState(selectedLanguage);
+
+  const handleChange = (langCode) => {
+    setSelected(langCode);
+    window.handleLanguageChange?.(langCode);
+  };
+
+  // Actualizar estado cuando cambian las props
+  useEffect(() => {
+    if (selectedLanguage && selectedLanguage !== selected) {
+      setSelected(selectedLanguage);
+    }
+  }, [selectedLanguage]);
+
   return (
-    <Listbox value={selectedLanguage} onChange={onLanguageChange}>
+    <Listbox value={selected} onChange={handleChange}>
       <div className="relative mt-1">
         <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-white/75 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-300 sm:text-sm">
           <span className="block truncate">
-            {languages.find(l => l.code === selectedLanguage)?.name || 'Seleccionar idioma'}
+            {languages.find(l => l.code === selected)?.name || 'Seleccionar idioma'}
           </span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
             <ChevronUpDownIcon

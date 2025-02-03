@@ -18,17 +18,29 @@ export async function POST({ request }) {
       });
     }
 
-    // Obtener información del servicio
-    const service = await servicesAPI.getServiceById(data.serviceId);
-    
-    // Enviar a n8n
-    const response = await webhookClient.sendQuery({
-      query: data.query,
-      service,
-      language: data.language
-    });
+    // Generar ID de conversación si no existe
+    const conversationId = data.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    return new Response(JSON.stringify(response), {
+    // Preparar payload para n8n
+    const n8nPayload = {
+      conversationId,
+      query: data.query,
+      language: data.language,
+      service: {
+        id: data.service.id,
+        title: data.service.title,
+        description: data.service.description
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    // Enviar a n8n
+    const response = await webhookClient.sendQuery(n8nPayload);
+
+    return new Response(JSON.stringify({
+      ...response,
+      conversationId
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -59,9 +71,13 @@ export async function PUT({ request }) {
       });
     }
 
+    // Aquí podrías implementar lógica para almacenar la conversación
+    // Por ejemplo, guardarla en Directus o en otra base de datos
+
     return new Response(JSON.stringify({
       success: true,
-      message: 'Response processed successfully'
+      message: 'Response processed successfully',
+      conversationId: data.conversationId
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
