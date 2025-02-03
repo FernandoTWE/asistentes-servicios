@@ -1,11 +1,33 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+import { ServiceSelector } from '../components/Services/ServiceSelector';
+import { LanguageSelector } from '../components/Layout/LanguageSelector';
+import { ChatWindow } from '../components/Chat/ChatWindow';
+import { servicesAPI } from '../lib/api/directus';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+// Obtener servicios de Directus
+const services = await servicesAPI.getServices();
 ---
 
-<Layout>
-	<Welcome />
-</Layout>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Asistente de Servicios</title>
+	</head>
+	<body class="bg-gray-100 min-h-screen">
+		<div class="container mx-auto px-4 py-8">
+			<div class="max-w-4xl mx-auto">
+				<h1 class="text-3xl font-bold text-gray-900 mb-8">Asistente de Servicios</h1>
+				
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+					<ServiceSelector client:load services={services} />
+					<LanguageSelector client:load />
+				</div>
+
+				<ChatWindow client:load />
+			</div>
+		</div>
+	</body>
+</html>

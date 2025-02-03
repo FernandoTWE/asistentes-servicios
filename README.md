@@ -1,48 +1,59 @@
-# Astro Starter Kit: Basics
+# ZUPI - Webhook API
 
-```sh
-npm create astro@latest -- --template basics
+## Descripción
+API simplificada para procesar consultas de usuarios mediante webhooks y n8n.
+
+## Arquitectura
+1. **Webhook de Entrada (`POST /api/webhook`)**
+   - Recibe consultas de usuarios
+   - Valida la estructura de datos
+   - Reenvía a n8n para procesamiento
+
+2. **Webhook de Respuesta (`PUT /api/webhook`)**
+   - Recibe respuestas procesadas de n8n
+   - Valida la estructura de datos
+   - Confirma la recepción
+
+## Estructura de Datos
+
+### Consulta (POST)
+```json
+{
+  "query": "pregunta del usuario",
+  "service": {
+    "id": "service-id",
+    "title": "nombre del servicio",
+    "description": "descripción del servicio"
+  },
+  "language": "es"
+}
 ```
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/astro/tree/latest/examples/basics)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/astro/tree/latest/examples/basics)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/withastro/astro?devcontainer_path=.devcontainer/basics/devcontainer.json)
-
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-![just-the-basics](https://github.com/withastro/astro/assets/2244813/a0a5533c-a856-4198-8470-2d67b1d7c554)
-
-## 🚀 Project Structure
-
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-│   └── favicon.svg
-├── src/
-│   ├── layouts/
-│   │   └── Layout.astro
-│   └── pages/
-│       └── index.astro
-└── package.json
+### Respuesta (PUT)
+```json
+{
+  "conversationId": "id-conversación",
+  "response": {
+    "type": "answer|clarification",
+    "message": "respuesta al usuario",
+    "suggestions": ["sugerencia1", "sugerencia2"]
+  }
+}
 ```
 
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
+## Configuración
+1. Copia `.env.example` a `.env`
+2. Configura las variables de entorno:
+   - `N8N_WEBHOOK_URL`: URL del webhook de n8n
+   - `N8N_AUTH_TOKEN`: Token de autenticación (opcional)
 
-## 🧞 Commands
+## Desarrollo
+```bash
+# Instalar dependencias
+npm install
 
-All commands are run from the root of the project, from a terminal:
+# Iniciar en desarrollo
+npm run dev
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+# Construir para producción
+npm run build
