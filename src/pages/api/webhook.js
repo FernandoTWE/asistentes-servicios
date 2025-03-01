@@ -29,7 +29,15 @@ export async function POST({ request }) {
       service: {
         id: data.service.id,
         title: data.service.title,
-        description: data.service.description
+        description: data.service.description,
+        prompt: data.service.prompt,
+        links: data.service.links,
+        documents: data.service.documents
+      },
+      user: {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email
       },
       timestamp: new Date().toISOString()
     };

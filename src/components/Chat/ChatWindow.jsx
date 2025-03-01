@@ -14,15 +14,30 @@ const QUICK_ACTIONS = [
   }
 ];
 
+const TYPING_MESSAGES = [
+  "Pensando...",
+  "Analizando la información...",
+  "Buscando la mejor respuesta...",
+  "Procesando tu consulta...",
+  "Recopilando datos relevantes...",
+  "Preparando una respuesta detallada...",
+  "Consultando la documentación...",
+  "Verificando la información...",
+  "Organizando la respuesta...",
+  "Un momento, por favor..."
+];
+
 export function ChatWindow({ initialService }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState(null);
   const [service, setService] = useState(initialService);
   const [isTyping, setIsTyping] = useState(false);
+  const [typingMessageIndex, setTypingMessageIndex] = useState(0);
+  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [hasAgentResponse, setHasAgentResponse] = useState(false);
   const messagesEndRef = useRef(null);
-  const unsubscribeRef = useRef(null);
+  const typingIntervalRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -32,54 +47,26 @@ export function ChatWindow({ initialService }) {
     scrollToBottom();
   }, [messages]);
 
-  // Cargar historial inicial y establecer mensaje de bienvenida
+  // Establecer mensaje de bienvenida inicial
   useEffect(() => {
-    const loadInitialState = async () => {
-      const { userName } = window.getCurrentState();
-      
-      // Mensaje de bienvenida
-      const welcomeMessage = {
-        type: 'assistant',
-        message: `<div class="space-y-2">
-          <p>Hola, soy Zupi, tu asistente virtual 👋</p>
-          <p>Bienvenid@ ${userName}, ¿con qué puedo ayudarte?</p>
-        </div>`
-      };
-
-      setMessages([welcomeMessage]);
-
-      // Si hay un conversationId guardado, cargar mensajes
-      const savedConversationId = localStorage.getItem('currentConversationId');
-      if (savedConversationId) {
-        try {
-          const messages = await directusAPI.getConversationMessages(savedConversationId);
-          if (messages.length > 0) {
-            setConversationId(savedConversationId);
-            const formattedMessages = messages.map(msg => ({
-              type: msg.user_type === 'user' ? 'user' : 'assistant',
-              message: msg.content
-            }));
-            setMessages(prev => [...prev, ...formattedMessages]);
-          }
-        } catch (error) {
-          console.error('Error al cargar historial:', error);
-        }
-      }
-    };
-
-    loadInitialState();
+    const { userName } = window.getCurrentState();
+    setMessages([{
+      type: 'assistant',
+      message: `<div class="space-y-2">
+        <p>Hola, soy Zupi, tu asistente virtual 👋</p>
+        <p>Bienvenid@ ${userName}, ¿con qué puedo ayudarte?</p>
+      </div>`
+    }]);
   }, []);
 
   // Escuchar cambios de servicio
   useEffect(() => {
     const handleServiceChange = async (event) => {
       const newService = event.detail;
-      setService(newService);
-      
-      // Limpiar conversación actual
+      // Obtener el servicio completo
+      const fullService = await directusAPI.getServiceById(newService.id);
+      setService(fullService.data);
       setMessages([]);
-      setConversationId(null);
-      localStorage.removeItem('currentConversationId');
       
       // Restaurar mensaje de bienvenida
       const { userName } = window.getCurrentState();
@@ -96,42 +83,27 @@ export function ChatWindow({ initialService }) {
     return () => document.removeEventListener('serviceChange', handleServiceChange);
   }, []);
 
-  // Suscribirse a nuevos mensajes cuando hay una conversación activa
+  // Efecto para la animación de typing
   useEffect(() => {
-    if (conversationId) {
-      // Guardar conversationId actual
-      localStorage.setItem('currentConversationId', conversationId);
-
-      // Limpiar suscripción anterior
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
+    if (isTyping) {
+      // Iniciar la rotación de mensajes
+      typingIntervalRef.current = setInterval(() => {
+        setTypingMessageIndex(prev => (prev + 1) % TYPING_MESSAGES.length);
+      }, 2000); // Cambiar mensaje cada 2 segundos
+    } else {
+      // Limpiar el intervalo cuando no está typing
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
       }
-
-      // Suscribirse a nuevos mensajes
-      unsubscribeRef.current = directusAPI.subscribeToMessages(
-        conversationId,
-        (newMessage) => {
-          if (newMessage.user_type === 'agent') {
-            setIsTyping(false);
-            setMessages(prev => [...prev, {
-              type: 'assistant',
-              message: newMessage.content
-            }]);
-          }
-        },
-        (error) => {
-          console.error('Error en la suscripción:', error);
-          setIsTyping(false);
-        }
-      );
+      setTypingMessageIndex(0);
     }
 
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
       }
     };
-  }, [conversationId]);
+  }, [isTyping]);
 
   const handleSendMessage = async (message) => {
     if (!message || loading) return;
@@ -154,52 +126,98 @@ export function ChatWindow({ initialService }) {
         throw new Error('No hay un usuario activo');
       }
 
-      // Enviar mensaje a n8n y crear en Directus
+      let conversationId = currentConversationId;
+
+      // Solo crear una nueva conversación si no existe una
+      if (!conversationId) {
+        const conversation = await directusAPI.fetch('/items/poc_conversations', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        conversationId = conversation.data.id;
+        setCurrentConversationId(conversationId);
+      }
+
+      // Crear mensaje del usuario
+      const userMessageResult = await directusAPI.createMessage(
+        message,
+        userId,
+        conversationId,
+        'user'
+      );
+
+      // Obtener servicio actualizado con todos sus datos
+      const serviceData = await directusAPI.getServiceById(currentService?.id);
+      console.log('Service Data from Directus:', JSON.stringify(serviceData, null, 2));
+      
+      if (!serviceData?.data) {
+        throw new Error('No se pudo obtener la información del servicio');
+      }
+
+      // Obtener datos del usuario
+      const userData = await directusAPI.getUserById(userId);
+      console.log('User Data from Directus:', JSON.stringify(userData, null, 2));
+
+      if (!userData?.data) {
+        throw new Error('No se pudo obtener la información del usuario');
+      }
+
+      const { data: service } = serviceData;
+      const { data: user } = userData;
+      
+      const webhookPayload = {
+        query: message,
+        serviceId: service.id,
+        language,
+        userName,
+        conversationId,
+        userId,
+        service: {
+          id: service.id,
+          title: service.title,
+          description: service.description,
+          prompt: service.prompt,
+          links: service.links,
+          documents: service.documents
+        },
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Webhook Payload:', JSON.stringify(webhookPayload, null, 2));
+      
+      // Enviar a n8n para procesar
       const response = await fetch('/api/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          query: message,
-          serviceId: currentService?.id,
-          language,
-          userName,
-          conversationId: conversationId,
-          userId,
-          service: {
-            id: currentService?.id,
-            title: currentService?.title,
-            description: currentService?.description
-          }
-        })
+        body: JSON.stringify(webhookPayload)
       });
 
       if (!response.ok) {
         throw new Error('Error al procesar la consulta');
       }
 
-      // Si no hay conversationId, esperar a que n8n cree uno
-      if (!conversationId) {
-        const data = await response.json();
-        if (data.conversationId) {
-          setConversationId(data.conversationId);
-        }
-      }
-
       // Esperar la respuesta del agente
       try {
         const agentResponse = await directusAPI.waitForAgentResponse(
           conversationId,
-          null,
+          userMessageResult.message.id,
           60000 // 1 minuto
         );
 
         setIsTyping(false);
+        setHasAgentResponse(true);
         setMessages(prev => [...prev, {
           type: 'assistant',
           message: agentResponse.content
         }]);
+
       } catch (error) {
         if (error.message === 'Tiempo de espera agotado') {
           setMessages(prev => [...prev, {
@@ -231,7 +249,9 @@ export function ChatWindow({ initialService }) {
 
   const handleQuickAction = (action) => {
     if (action.text === 'Prefiero hablar con un técnico') {
-      window.open('https://soporte.fractalia.es', '_blank');
+      if (typeof window.openChat === 'function') {
+        window.openChat();
+      }
     } else {
       handleSendMessage(action.text);
     }
@@ -276,20 +296,18 @@ export function ChatWindow({ initialService }) {
 
             {/* Quick Actions */}
             <div className="space-y-2">
-              {QUICK_ACTIONS.map((action, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleQuickAction(action)}
-                  className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors flex items-center space-x-2"
-                >
-                  <action.icon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                  <span className="text-gray-700">{action.text}</span>
-                </button>
-              ))}
+              <button
+                onClick={() => handleSendMessage('Mi duda no aparece en la lista')}
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors flex items-center space-x-2"
+              >
+                <QuestionMarkCircleIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                <span className="text-gray-700">Mi duda no aparece en la lista</span>
+              </button>
             </div>
           </>
         )}
 
+        {/* Mensajes */}
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -303,20 +321,70 @@ export function ChatWindow({ initialService }) {
                 'max-w-[80%] rounded-lg p-3',
                 msg.type === 'user'
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-900'
+                  : 'bg-gray-100 text-gray-900',
+                'chat-message prose prose-sm max-w-none',
+                msg.type === 'user'
+                  ? 'prose-invert' // Invertir colores para mensajes del usuario
+                  : 'prose-gray'   // Colores normales para mensajes del asistente
               )}
-              dangerouslySetInnerHTML={{ __html: msg.message }}
-            />
+            >
+              <div
+                className={clsx(
+                  'chat-content',
+                  // Estilos específicos para elementos HTML
+                  '[&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mt-2 [&_ul]:mb-2',
+                  '[&_ol]:list-decimal [&_ol]:pl-4 [&_mt-2] [&_mb-2]',
+                  '[&_li]:mt-1',
+                  '[&_p]:mt-2 [&_p]:mb-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
+                  '[&_strong]:font-semibold',
+                  '[&_a]:underline [&_a]:text-blue-600 hover:[&_a]:text-blue-800',
+                  msg.type === 'user'
+                    ? '[&_a]:text-blue-300 hover:[&_a]:text-blue-100' // Links en mensajes del usuario
+                    : '[&_a]:text-blue-600 hover:[&_a]:text-blue-800'  // Links en mensajes del asistente
+                )}
+                dangerouslySetInnerHTML={{ __html: msg.message }}
+              />
+            </div>
           </div>
         ))}
+
+        {/* Botón de hablar con técnico cuando hay respuesta */}
+        {hasAgentResponse && currentConversationId && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => {
+                const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:4321' : window.location.origin;
+                const url = `${baseUrl}/conversation?conversationId=${currentConversationId}`;
+                const message = `Ver histórico de la conversación:\n\n${url}`;
+                console.log('URL formada:', url);
+                console.log('Mensaje enviado a SigmaChat:', message);
+                window.openChat();
+                SigmaChat.showChat();
+                SigmaChat.sendSilentMessage(message);
+              }}
+              className="bg-primary-500 text-white px-6 py-2 rounded-lg hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center space-x-2"
+            >
+              <ChatBubbleOvalLeftIcon className="w-5 h-5" />
+              <span>Hablar con un técnico</span>
+            </button>
+          </div>
+        )}
 
         {isTyping && (
           <div className="flex justify-start mb-4">
             <div className="bg-gray-100 text-gray-900 max-w-[80%] rounded-lg p-3">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+              <div className="flex items-center space-x-3">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+                <span 
+                  className="text-sm text-gray-600 transition-opacity duration-300"
+                  key={typingMessageIndex} // Para forzar la animación de fade
+                >
+                  {TYPING_MESSAGES[typingMessageIndex]}
+                </span>
               </div>
             </div>
           </div>

@@ -4,16 +4,16 @@ import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import clsx from 'clsx';
 
 const languages = [
-  { code: 'es', name: 'Español' },
-  { code: 'en', name: 'English' },
-  { code: 'fr', name: 'Français' },
-  { code: 'de', name: 'Deutsch' },
-  { code: 'it', name: 'Italiano' },
-  { code: 'pt', name: 'Português' },
-  { code: 'nl', name: 'Nederlands' }
+  { code: 'es-ES', name: 'Español' },
+  { code: 'en-US', name: 'English' },
+  { code: 'fr-FR', name: 'Français' },
+  { code: 'de-DE', name: 'Deutsch' },
+  { code: 'it-IT', name: 'Italiano' },
+  { code: 'pt-BR', name: 'Português' },
+  { code: 'nl-NL', name: 'Nederlands' }
 ];
 
-export function LanguageSelector({ selectedLanguage = 'es' }) {
+export function LanguageSelector({ selectedLanguage = 'es-ES' }) {
   const [selected, setSelected] = useState(selectedLanguage);
 
   const handleChange = (langCode) => {

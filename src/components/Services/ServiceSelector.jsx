@@ -2,34 +2,46 @@ import { useState, useEffect } from 'react';
 import { Listbox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import clsx from 'clsx';
+import { directusAPI } from '../../lib/api/directus';
 
 export function ServiceSelector({ services = [] }) {
   const [selected, setSelected] = useState(null);
 
   // Inicializar con el servicio guardado o el primero de la lista
   useEffect(() => {
-    if (services.length > 0) {
-      const savedServiceId = typeof window !== 'undefined' 
-        ? localStorage.getItem('selectedServiceId')
-        : null;
-      
-      const serviceToSelect = savedServiceId 
-        ? services.find(s => s.id === savedServiceId)
-        : services[0];
+    const initializeService = async () => {
+      if (services.length > 0) {
+        const savedServiceId = typeof window !== 'undefined' 
+          ? localStorage.getItem('selectedServiceId')
+          : null;
         
-      setSelected(serviceToSelect);
-    }
+        const initialServiceId = savedServiceId || services[0].id;
+        const fullService = await directusAPI.getServiceById(initialServiceId);
+        
+        if (fullService?.data) {
+          setSelected(fullService.data);
+          window.handleServiceChange?.(fullService.data);
+        }
+      }
+    };
+
+    initializeService();
   }, [services]);
 
-  // Notificar cambios de selección
-  useEffect(() => {
-    if (selected) {
-      window.handleServiceChange?.(selected);
+  // Manejar cambio de servicio
+  const handleServiceChange = async (service) => {
+    const fullService = await directusAPI.getServiceById(service.id);
+    if (fullService?.data) {
+      setSelected(fullService.data);
+      window.handleServiceChange?.(fullService.data);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedServiceId', service.id);
+      }
     }
-  }, [selected]);
+  };
 
   return (
-    <Listbox value={selected} onChange={setSelected}>
+    <Listbox value={selected} onChange={handleServiceChange}>
       <div className="relative">
         <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border focus:outline-none focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-300">
           <span className="block truncate">
@@ -54,13 +66,18 @@ export function ServiceSelector({ services = [] }) {
               }
               value={service}
             >
-              {({ selected }) => (
+              {({ selected, active }) => (
                 <>
                   <span className={clsx('block truncate', selected ? 'font-medium' : 'font-normal')}>
                     {service.title}
                   </span>
                   {selected ? (
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-600">
+                    <span
+                      className={clsx(
+                        'absolute inset-y-0 left-0 flex items-center pl-3',
+                        active ? 'text-primary-600' : 'text-primary-600'
+                      )}
+                    >
                       <CheckIcon className="h-5 w-5" aria-hidden="true" />
                     </span>
                   ) : null}

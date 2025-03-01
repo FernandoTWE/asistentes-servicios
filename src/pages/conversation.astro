@@ -1,0 +1,159 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { directusAPI } from '../lib/api/directus';
+
+const conversationId = Astro.url.searchParams.get('conversationId');
+let conversation = null;
+let error = null;
+
+if (conversationId) {
+  try {
+    const response = await fetch(
+      `${import.meta.env.PUBLIC_DIRECTUS_URL}/items/poc_conversations?filter[id][_eq]=${conversationId}&fields=*,poc_message.*`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.PUBLIC_DIRECTUS_TOKEN}`
+        }
+      }
+    );
+    const data = await response.json();
+    conversation = data.data[0];
+  } catch (e) {
+    error = 'Error al cargar la conversación';
+    console.error(e);
+  }
+}
+
+// Organizar mensajes por fecha
+const messagesByDate = conversation?.poc_message?.reduce((acc, message) => {
+  const date = new Date(message.timestamp).toLocaleDateString();
+  if (!acc[date]) {
+    acc[date] = [];
+  }
+  acc[date].push(message);
+  return acc;
+}, {}) || {};
+
+// Ordenar las fechas de más antigua a más reciente
+const sortedDates = Object.keys(messagesByDate).sort((a, b) => {
+  return new Date(a) - new Date(b);
+});
+
+// Ordenar los mensajes dentro de cada fecha por timestamp
+sortedDates.forEach(date => {
+  messagesByDate[date].sort((a, b) => {
+    return new Date(a.timestamp) - new Date(b.timestamp);
+  });
+});
+---
+
+<Layout title="Histórico de Conversación">
+  <main class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      {error && (
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span class="block sm:inline">{error}</span>
+        </div>
+      )}
+
+      {!conversationId && (
+        <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+          <span class="block sm:inline">No se ha proporcionado un ID de conversación</span>
+        </div>
+      )}
+
+      {conversation && (
+        <div class="bg-white rounded-lg shadow-lg p-6">
+          <h1 class="text-2xl font-bold mb-6">Histórico de Conversación</h1>
+          
+          {sortedDates.map((date) => (
+            <div class="mb-8">
+              <div class="flex items-center mb-4">
+                <div class="flex-grow h-px bg-gray-200"></div>
+                <span class="px-4 text-sm font-medium text-gray-500">{date}</span>
+                <div class="flex-grow h-px bg-gray-200"></div>
+              </div>
+
+              <div class="space-y-4">
+                {messagesByDate[date].map((message) => (
+                  <div class={`flex ${message.user_type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div class="flex items-start max-w-[80%] space-x-2">
+                      {message.user_type !== 'user' && (
+                        <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                          <svg class="w-5 h-5 text-primary-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="currentColor"/>
+                          </svg>
+                        </div>
+                      )}
+
+                      <div class={`rounded-lg p-4 ${
+                        message.user_type === 'user' 
+                          ? 'bg-primary-600 text-white' 
+                          : 'bg-gray-100 text-gray-900'
+                      }`}>
+                        <div class="flex items-center space-x-2 mb-1">
+                          <span class="font-medium">
+                            {message.user_type === 'user' ? 'Tú' : 'Zupi AI'}
+                          </span>
+                          <span class="text-xs opacity-75">
+                            {new Date(message.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div class={`chat-content prose prose-sm max-w-none ${
+                          message.user_type === 'user' ? 'prose-invert' : 'prose-gray'
+                        }`} set:html={message.content} />
+                      </div>
+
+                      {message.user_type === 'user' && (
+                        <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
+                          <span class="text-white text-sm font-medium">
+                            {message.user_type === 'user' ? 'U' : 'AI'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </main>
+</Layout>
+
+<style>
+  /* Estilos para el contenido del chat */
+  .chat-content :global(ul) {
+    list-style-type: disc;
+    padding-left: 1rem;
+    margin: 0.5rem 0;
+  }
+  .chat-content :global(ol) {
+    list-style-type: decimal;
+    padding-left: 1rem;
+    margin: 0.5rem 0;
+  }
+  .chat-content :global(li) {
+    margin: 0.25rem 0;
+  }
+  .chat-content :global(p) {
+    margin: 0.5rem 0;
+  }
+  .chat-content :global(p:first-child) {
+    margin-top: 0;
+  }
+  .chat-content :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .chat-content :global(a) {
+    text-decoration: underline;
+  }
+  .chat-content :global(.prose-invert a) {
+    color: #93c5fd;
+  }
+  .chat-content :global(.prose-invert a:hover) {
+    color: #bfdbfe;
+  }
+</style>

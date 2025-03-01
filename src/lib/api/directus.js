@@ -28,7 +28,9 @@ class DirectusAPI {
 
   async getServices() {
     try {
-      const response = await this.fetch('/items/poc_service?fields=*,faqs.*');
+      console.log('Fetching all services...');
+      const response = await this.fetch('/items/poc_service');
+      console.log('Services response:', response);
       return response;
     } catch (error) {
       console.error('Error al obtener servicios:', error);
@@ -38,7 +40,9 @@ class DirectusAPI {
 
   async getServiceById(id) {
     try {
-      const response = await this.fetch(`/items/poc_service/${id}?fields=*,faqs.*`);
+      console.log('Fetching service with ID:', id);
+      const response = await this.fetch(`/items/poc_service/${id}?fields=*,links.*,documents.*,faqs.*,prompt`);
+      console.log('Service response:', JSON.stringify(response, null, 2));
       return response;
     } catch (error) {
       console.error('Error al obtener servicio:', error);
@@ -53,6 +57,18 @@ class DirectusAPI {
     } catch (error) {
       console.error('Error al obtener usuarios:', error);
       return { data: [] };
+    }
+  }
+
+  async getUserById(id) {
+    try {
+      console.log('Fetching user with ID:', id);
+      const response = await this.fetch(`/items/users/${id}`);
+      console.log('User response:', JSON.stringify(response, null, 2));
+      return response;
+    } catch (error) {
+      console.error('Error al obtener usuario:', error);
+      return null;
     }
   }
 
@@ -103,7 +119,7 @@ class DirectusAPI {
 
   // Esperar respuesta del agente con timeout
   async waitForAgentResponse(conversationId, lastMessageId, maxWaitTime = 60000) {
-    const pollInterval = 5000; // 5 segundos
+    const pollInterval = 2000; // 2 segundos
     const startTime = Date.now();
     
     const checkForResponse = async () => {

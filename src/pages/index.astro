@@ -20,6 +20,19 @@ const defaultUser = users[0] || { id: null, name: 'Invitado' };
 ---
 
 <Layout title="Chat">
+  <head>
+    <style>
+      .sigma-btn {
+        border-radius: 1.25rem !important;
+      }
+      .sigma-minimized-img {
+        border: solid 2px !important;
+        color: blue !important;
+      }
+    </style>
+    <script src="https://sigmafractalia.nuvetoapps.com/dist/js/sigma-chat-v2.js" data-fab></script>
+  </head>
+
   <main class="container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
       <div class="mb-6 flex flex-wrap gap-4 items-end">
@@ -82,6 +95,92 @@ const defaultUser = users[0] || { id: null, name: 'Invitado' };
         });
       }
     }
+
+    // Función para abrir el chat de Sigma
+    function openChat() {
+      if (typeof SigmaChat === 'undefined') {
+        console.warn('SigmaChat no está disponible');
+        return;
+      }
+
+      if (SigmaChat.isOpen && SigmaChat.isOpen()){
+        if(!confirm('Si empiezas una nueva conversación, la conversación actual se cancelará. ¿Quieres empezar una nueva conversación?')){
+          return;
+        }
+        if (typeof SigmaChat.closeChat === 'function') {
+          SigmaChat.closeChat();
+        }
+      }
+
+      const userSelect = document.getElementById('userId');
+      const userName = userSelect ? userSelect.options[userSelect.selectedIndex].text : 'Invitado';
+
+      document.documentElement.style.setProperty('--sigma-primary-color', '#0e1b64');
+      document.documentElement.style.setProperty('--sigma-secondary-color', '#36b3ed');
+      document.documentElement.style.setProperty('--sigma-background-chat', '#fff');
+      document.documentElement.style.setProperty('--sigma-font-color-popup', '#fff');
+      document.documentElement.style.setProperty('--sigma-start-chat-color', '#36b3ed');
+      document.documentElement.style.setProperty('--sigma-start-chat-hover-color', '#0e1b64');
+      document.documentElement.style.setProperty('--sigma-font-size', '16px');
+      document.documentElement.style.setProperty('--sigma-font-family', 'Arial, Helvetica, Sans-serif');
+
+      try {
+        new SigmaChat({
+          id: 'fractalia-v3',
+          title: 'Fractalia',
+          headline: '¿En qué podemos ayudarte?',
+          logo: {
+            src: "https://fractaliasystems.com/wp-content/uploads/2018/09/logo_grupo_fractalia.png",
+            height: "80px"
+          },
+          icon: {
+            src: "https://fractaliasystems.com/wp-content/uploads/2018/09/favicon3.png"
+          },
+          dateFormat: 'MMMM Do YYYY, hh:mm',
+          drawFAB: false,
+          autoMessage: null,
+          confirmMessage: {
+            message: "¿Le gustaría hablar con un agente?<br><br>Hola es un segundo texto",
+            name: "Fractalia",
+            buttons: [{label: "Deseo hablar con un agente", value: "es"}]
+          },
+          keepHistory: true,
+          canSendFiles: true,
+          hasSurvey: true,
+          noConfirmTerminate: false,
+          color: '#323E48',
+          phone: {},
+          links: [],
+          lang: currentLanguage,
+          footer: '',
+          fields: [],
+          user: {
+            firstName: userName,
+            email: `${userName.toLowerCase().replace(/\s+/g, '.')}@fractalia.es`,
+            number1: "+55112365487",
+            lang: currentLanguage,
+            campaign: "CHAT_N1_ISC",
+            Question: "soporte_iot",
+            Acuerdo: "Home Digital",
+            JiraLicense: `${userName.toLowerCase().replace(/\s+/g, '.')}@fractalia.es-FRA`,
+            Url_Acuerdo: "https://fractalia.smartsupport.devonlineassist.me"
+          },
+          hideField: []
+        });
+
+        if (typeof SigmaChat.showChat === 'function') {
+          SigmaChat.showChat();
+        }
+
+        if (typeof SigmaChat.sendSilentMessage === 'function') {
+          SigmaChat.sendSilentMessage("Nombre prueba:\n\nenlace https://google.com");
+        }
+      } catch (error) {
+        console.error('Error al inicializar SigmaChat:', error);
+      }
+    }
+
+    window.openChat = openChat;
 
     // Función global para obtener el estado actual
     window.getCurrentState = () => ({
